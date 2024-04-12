@@ -134,6 +134,7 @@ Conditional Deployment Params
 param deployAzureStorage bool = false
 param deployCDN bool          = false //If true then FrontDoor MUST be false
 param deployFrontDoor bool    = false //If true then CDN MUST be false
+param deployPrivateNetwork bool = false
 
 /*
 Local Variables for storage account
@@ -283,7 +284,7 @@ resource appServiceWebApp 'Microsoft.Web/sites@2022-03-01' = {
       ]
       connectionStrings: []
       linuxFxVersion: linuxFxVersion
-      vnetRouteAllEnabled: true
+      vnetRouteAllEnabled: deployPrivateNetwork ? true : null
     }
     serverFarmId:appServiceHostingPlan.id
     clientAffinityEnabled: false
@@ -332,19 +333,19 @@ resource mySQLserver 'Microsoft.DBforMySQL/flexibleServers@2021-05-01' = {
       backupRetentionDays: backupRetentionDays
       geoRedundantBackup: geoRedundantBackup
     }
-    network: {
+    network: deployPrivateNetwork ? {
       privateDnsZoneResourceId: privateDnsZoneMySql.id
       delegatedSubnetResourceId: resourceId('Microsoft.Network/virtualNetworks/subnets', vnetName, subnetForDb)
-    }
+    } : null
   }
 
   sku: {
     name: vmName
     tier: serverEdition
   }
-  dependsOn: [
+  dependsOn: deployPrivateNetwork ? [
     privateDnsZoneMySqlVnetlink
-  ]
+  ] : []
 }
 
 @description('Wordpress DB name')
@@ -359,7 +360,7 @@ resource wordpressDatabase 'Microsoft.DBforMySQL/flexibleServers/databases@2021-
 }
 
 @description('Virtual network')
-resource virtualNetwork 'Microsoft.Network/virtualNetworks@2022-05-01' = {
+resource virtualNetwork 'Microsoft.Network/virtualNetworks@2022-05-01' = if(deployPrivateNetwork) {
   location: location
   name: vnetName
   properties: {
@@ -402,13 +403,13 @@ resource virtualNetwork 'Microsoft.Network/virtualNetworks@2022-05-01' = {
  }
 
 @description('Private DNS Zone for Database')
-resource privateDnsZoneMySql 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+resource privateDnsZoneMySql 'Microsoft.Network/privateDnsZones@2020-06-01' = if(deployPrivateNetwork) {
   name: privateDnsZoneNameForDb
   location: 'global'
 }
 
 @description('Link DNS Zone to VNet')
-resource privateDnsZoneMySqlVnetlink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+resource privateDnsZoneMySqlVnetlink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = if(deployPrivateNetwork) {
   parent: privateDnsZoneMySql
   name: '${privateDnsZoneNameForDb}-vnetlink'
   location: 'global'
@@ -421,19 +422,19 @@ resource privateDnsZoneMySqlVnetlink 'Microsoft.Network/privateDnsZones/virtualN
 }
 
 @description('Configure the Web app to use the Subnet')
-resource appServiceVNetConfig 'Microsoft.Web/sites/networkConfig@2022-03-01' = {
+resource appServiceVNetConfig 'Microsoft.Web/sites/networkConfig@2022-03-01' = if(deployPrivateNetwork) {
   parent: appServiceWebApp
   name: 'virtualNetwork'
   properties: {
     subnetResourceId: resourceId('Microsoft.Network/virtualNetworks/subnets', vnetName, subnetForApp)
   }
-  dependsOn: [
+  dependsOn: deployPrivateNetwork ? [
     privateDnsZoneMySqlVnetlink
-  ]
+  ] : []
 }
 
 @description('Web app configuration')
-resource appServiceSiteConfig 'Microsoft.Web/sites/config@2022-03-01' = {
+resource appServiceSiteConfig 'Microsoft.Web/sites/config@2022-03-01' = if (deployPrivateNetwork) {
   parent: appServiceWebApp
   name: 'web'
   properties: {
