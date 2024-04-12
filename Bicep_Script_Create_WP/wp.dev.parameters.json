@@ -17,11 +17,14 @@
         "deployFrontDoor": {
             "value": false
         },
+        "deployPrivateNetwork": {
+            "value": false
+        },
         "appSvcSku": {
-            "value": "PremiumV2"
+            "value": "Standard"
         },
         "appSvcSkuCode": {
-            "value": "P1v2"
+            "value": "S1"
         },
         "storageSizeGB": {
             "value": 128
@@ -39,7 +42,7 @@
             "value": "Disabled"
         },
         "vmName": {
-            "value": "Standard_D2ds_v4"
+            "value": "Standard_B1ms"
         },
         "serverName": {
             "value": "wp-app-dbserver"
